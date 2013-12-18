@@ -6,10 +6,21 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXFileReference section */
+		99D68135185BE0F10005DB0B /* core.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = core.py; sourceTree = "<group>"; };
+		99D68136185BE1300005DB0B /* YeastORFRead.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = YeastORFRead.py; sourceTree = "<group>"; };
+		99D68137185BE1500005DB0B /* HumanORFFind.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = HumanORFFind.py; sourceTree = "<group>"; };
+		99D68138185BE16C0005DB0B /* DrugTargetPairRetriever.py */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.python; path = DrugTargetPairRetriever.py; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
 /* Begin PBXGroup section */
 		99D6812A185BE0B50005DB0B = {
 			isa = PBXGroup;
 			children = (
+				99D68136185BE1300005DB0B /* YeastORFRead.py */,
+				99D68137185BE1500005DB0B /* HumanORFFind.py */,
+				99D68138185BE16C0005DB0B /* DrugTargetPairRetriever.py */,
+				99D68135185BE0F10005DB0B /* core.py */,
 			);
 			sourceTree = "<group>";
 		};
