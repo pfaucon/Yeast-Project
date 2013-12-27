@@ -14,8 +14,7 @@ print "Libraries verified!"
 is_dna_seq = False
 
 sequences = YeastORFRead.yeast_main(is_dna_seq)
-#orfs = execfile("YeastORFRead.py");
-#humans = HumanORFFind.blast_main(sequences,is_dna_seq)
+humans = HumanORFFind.blast_main(sequences,is_dna_seq)
 drugs = DrugTargetPairRetriever.drug_main()
 
 #print len(orfs)
