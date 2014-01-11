@@ -8,11 +8,9 @@ import gzip
 import os #for abs path
 import sys #for normal print
 
-#do a bunch of prints to ensure things are working, it is very verbose
-DEBUG = False
+import ProjectDefinitions
 
-#this isn't important data but having it cached is nice, abspath strips trailing '/'
-data_directory = os.path.abspath("../../Data/Cache") + "/"
+data_directory = ProjectDefinitions.data_directory
 
 # as of now this function requires biopython to be installed on the system
 # http://biopython.org
@@ -41,10 +39,10 @@ def getYeastData(is_dna_seq):
 
     #Download the data if it isn't present
     try:
-        if DEBUG:
+        if ProjectDefinitions.DEBUG:
             print "trying to open yeast data file at: " + filename
         f_ptr = open(filename, "r")
-        if DEBUG:
+        if ProjectDefinitions.DEBUG:
             print "File opened successfully!"
         #file_contents = f_ptr.read()
         f_ptr.close()
@@ -64,7 +62,7 @@ def getYeastData(is_dna_seq):
         #download from previously known good loction
         urllib.urlretrieve(source_url, zipped_filename);
 
-        if DEBUG:
+        if ProjectDefinitions.DEBUG:
             sys.stdout.write("Download completed, decompressing...")
 
         #unzip the results
@@ -74,7 +72,7 @@ def getYeastData(is_dna_seq):
         
         fileout.close();
         f.close()
-        if DEBUG:
+        if ProjectDefinitions.DEBUG:
             print "file decompressed";
 
 
@@ -96,7 +94,7 @@ def extractORFNames(filename):
     #Create a BioPython seq object
     records = list(SeqIO.parse(filename, "fasta"))
     print "parse complete, " + str(len(records)) + " records found!"
-    if DEBUG:
+    if ProjectDefinitions.DEBUG:
         print "dumping one record of " + str(len(records)) + "..."
         print records[0]
         print "sequence: " + records[0].seq

@@ -1,20 +1,17 @@
 import os
 import sys
 
+import YeastORFRead
+import HumanORFFind
+import BlastAggregation
+import BlastAnalysis
+
 print "I think I'm running from '" + os.path.abspath(".")+ "', if that's not where my cache is then make sure I'm being launched properly!"
 
 #data analysis mode or actual run-through mode?
 lookForResults = False
 
 if lookForResults:
-    
-    sys.stdout.write("Verifying local libraries...")
-
-    import YeastORFRead
-    import HumanORFFind
-    import BlastAggregation
-
-    print "Libraries verified!"
     
     #dna seq or protein seq?
     is_dna_seq = False
@@ -30,13 +27,13 @@ if lookForResults:
     BlastAggregation.blast_aggregation_main()
 
 else:
-    import BlastAggregation, BlastAnalysis
-    print "Library loaded!"
-    results = BlastAggregation.blast_aggregation_main()
 
     #find reasonable drug/target pairs
     import DrugTargetPairRetriever
     drugs = DrugTargetPairRetriever.drug_main()
+
+    results = BlastAggregation.blast_aggregation_main()
+
     print "fin!"
 
 

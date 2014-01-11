@@ -1,12 +1,13 @@
 # Return a set of dictionaries providing drug->gene and gene->drug pairs
 # If we don't have them locally then go to www.drugbank.ca/ to pull them
 
-import ProjectDefinitions
 import sys
-
 import urllib
 import zipfile
-import csv,sqlite3
+import csv
+import sqlite3
+
+import ProjectDefinitions
 
 #all of the drug information, more than we need now
 #zipped_filename = data_directory + "drugbank.xml.zip"
@@ -61,19 +62,20 @@ def getDrugData():
 #from the original drug data some of the drugs are genetic modifiers, and some are physical modifiers
 #this function will separate physiological effects from genetic modifications
 def fileToSQLite():
-    print "trying to convert file to sqlite database..."
-    import csv, sqlite3
-    conn = sqlite3.connect(ProjectDefinitions.data_directory+"drugbank.sqlite")
+    print "trying to convert file to a sqlite database..."
+    conn = sqlite3.connect(ProjectDefinitions.data_directory+ProjectDefinitions.drugbank_db_name)
     curs = conn.cursor()
     curs.execute("DROP TABLE IF EXISTS 'drugs'");
-    curs.execute("CREATE TABLE drugs (ID INTEGER PRIMARY KEY,Name TEXT,Gene_Name TEXT ,GenBank_Protein_ID INTEGER,GenBank_Gene_ID TEXT,UniProt_ID TEXT,Uniprot_Title TEXT ,PDB_ID TEXT,GeneCard_ID TEXT,GenAtlas_ID TEXT,HGNC_ID TEXT,HPRD_ID INTEGER,Species_Category TEXT,Species TEXT,Drug_IDs TEXT);")
+    curs.execute("CREATE TABLE drugs (ID INTEGER PRIMARY KEY,Name TEXT,Gene_Name TEXT ,GenBank_Protein_ID INTEGER,GenBank_Gene_ID TEXT,UniProt_ID TEXT,Uniprot_Title TEXT ,PDB_ID TEXT,GeneCard_ID TEXT,GenAtlas_ID TEXT,HGNC_ID TEXT,HPRD_ID INTEGER,Species_Category TEXT,Species TEXT,Drug_IDs TEXT, Yeast_ID TEXT);")
     #curs.execute("CREATE TABLE drugs (geneName TEXT PRIMARY KEY, type INTEGER, term TEXT, definition TEXT);")
     
     print "database created, reading in..."
     
     with open(filename, 'rU') as fin:
         dr = csv.DictReader(fin)
-        to_db = [(i['ID'], i['Name'], i['Gene Name'], i['GenBank Protein ID'], i['GenBank Gene ID'], i['UniProt ID'], i['Uniprot Title'], i['PDB ID'], i['GeneCard ID'], i['GenAtlas ID'], i['HGNC ID'], i['HPRD ID'], i['Species Category'], i['Species'], i['Drug IDs']) for i in dr]
+        to_db = [(i['ID'], i['Name'], i['Gene Name'], i['GenBank Protein ID'], i['GenBank Gene ID'],
+                  i['UniProt ID'], i['Uniprot Title'], i['PDB ID'], i['GeneCard ID'], i['GenAtlas ID'],
+                  i['HGNC ID'], i['HPRD ID'], i['Species Category'], i['Species'], i['Drug IDs']) for i in dr]
     
     curs.executemany("INSERT INTO drugs (ID,Name,Gene_Name,GenBank_Protein_ID,GenBank_Gene_ID,UniProt_ID,Uniprot_Title ,PDB_ID,GeneCard_ID,GenAtlas_ID,HGNC_ID,HPRD_ID,Species_Category,Species,Drug_IDs) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", to_db)
     conn.commit()

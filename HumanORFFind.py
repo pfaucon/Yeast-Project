@@ -16,18 +16,11 @@ import sys
 # as of now this function requires biopython to be installed on the system
 # http://biopython.org
 from Bio import SeqIO
-from Bio.Blast import NCBIWWW
+import Bio.Blast.Applications
 from Bio.Blast.Applications import NcbiblastpCommandline
-from Bio.Blast.Applications import NcbideltablastCommandline
+#from Bio.Blast.Applications import NcbideltablastCommandline
 
-
-
-#FIXME: This isn't global between the scripts, this could be a problem in the future
-#this isn't important data but having it cached is nice, abspath strips trailing '/'
-data_directory = os.path.abspath("../../Data/Cache") + "/"
-fastadir = data_directory + "fasta/"
-blastpdir = data_directory + "blastp/"
-deltablastdir = data_directory + "deltablast/"
+import ProjectDefinitions
 
 def blast_main(yeast_sequences,is_dna_seq):
     
@@ -43,7 +36,7 @@ def blast_main(yeast_sequences,is_dna_seq):
 
             print "name:" + record.name
             
-            filename = fastadir + record.name +".fasta"
+            filename = ProjectDefinitions.fastadir + record.name +".fasta"
             
             #write the fasta individually
             output_handle = open(filename, "w")
@@ -52,7 +45,7 @@ def blast_main(yeast_sequences,is_dna_seq):
             
             
             #do a blastp run
-            resultname = blastpdir + record.name + "_blastpresults.xml"
+            resultname = ProjectDefinitions.blastpdir + record.name + "_blastpresults.xml"
             if os.path.isfile(resultname):
                 print "blastp cache record found, skipping blastp!"
             else:
@@ -64,12 +57,12 @@ def blast_main(yeast_sequences,is_dna_seq):
             
             
             #do a deltablast run
-            resultname = deltablastdir + record.name + "_deltablastresults.xml"
+            resultname = ProjectDefinitions.deltablastdir + record.name + "_deltablastresults.xml"
             if os.path.isfile(resultname):
                 print "delta blast cache record found, skipping delta blast!"
             else:
                 start = time.time()
-                deltablast_cline = NcbideltablastCommandline(query=filename, db="nr_humans", outfmt=5, out=resultname,num_threads=16)
+                deltablast_cline = Bio.Blast.Applications.NcbideltablastCommandline(query=filename, db="nr_humans", outfmt=5, out=resultname,num_threads=16)
                 print(deltablast_cline)
                 stdout, stderr = deltablast_cline()
                 print "delta blast complete! total time(seconds) =" +str(time.time()-start)
@@ -79,11 +72,11 @@ def blast_main(yeast_sequences,is_dna_seq):
     print "total time(seconds) = " + str(time.time()-initialTime) + ". Time in hours: " + str((time.time()-initialTime)/360)
 
 def configureCachedirs():
-    if not os.path.exists(fastadir):
-        os.makedirs(fastadir)
+    if not os.path.exists(ProjectDefinitions.fastadir):
+        os.makedirs(ProjectDefinitions.fastadir)
     
-    if not os.path.exists(blastpdir):
-        os.makedirs(blastpdir)
+    if not os.path.exists(ProjectDefinitions.blastpdir):
+        os.makedirs(ProjectDefinitions.blastpdir)
 
-    if not os.path.exists(deltablastdir):
-        os.makedirs(deltablastdir)
+    if not os.path.exists(ProjectDefinitions.deltablastdir):
+        os.makedirs(ProjectDefinitions.deltablastdir)

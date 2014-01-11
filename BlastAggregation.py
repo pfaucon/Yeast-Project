@@ -1,12 +1,13 @@
 #given the results from blastp and deltablast do some basic analytics on the results
 
-from Bio.Blast import NCBIXML
-from Bio import SeqIO
 import os
 import glob
 import sys
 import re
+import sqlite3
 
+from Bio.Blast import NCBIXML
+from Bio import SeqIO
 
 #from http://stackoverflow.com/questions/5686211/are-there-any-function-that-can-calculate-score-for-the-aligned-sequences-give-p
 from Bio.SubsMat.MatrixInfo import blosum62 as blosum
@@ -18,7 +19,11 @@ import ProjectDefinitions
 
 def blast_aggregation_main():
 
-    seq = get_fasta_sequences()
+    print("aggregating results...")
+
+
+    fasta_file = ProjectDefinitions.data_directory + "yeast_genome_proteins.fasta"
+    seq = get_fasta_sequences(fasta_file)
 
     blastp_file_path = ProjectDefinitions.blastpdir+"*_blastpresults.xml"
     aggregate_blastp = ProjectDefinitions.data_directory + "aggregate_blastp.txt"
@@ -36,67 +41,94 @@ def blast_aggregation_main():
 # and load it into an aggregate file
 def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
 
-
     #if the file exists and we don't want to overwrite it then just quit out
     if(os.path.exists(outfilename) and not overwrite):
         print "INFO: file ", outfilename, " exists and overwrite is disabled, skipping..."
         return
 
     print "loading all sequences in ",directory, "..."
-    outhandle=open(outfilename,"w")
+    outhandle = open(outfilename,"w")
     outhandle.write("sequence name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\te_value\n")
+
+    outhandle_unfound = open(outfilename[:-4] + "_unfound.txt","w")
+    outhandle_unfound.write("sequence name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\te_value\n")
+
+    conn = sqlite3.connect(ProjectDefinitions.data_directory+ProjectDefinitions.drugbank_db_name)
+    curs = conn.cursor()
+
     for file in glob.glob(directory):
 
         if(os.path.getsize(file) <= 1):
             print("File: " + file + " Appears to be  empty, skipping...")
             continue
-        print("now working on:" + file)
-        result_handle=open(file)
-        blast_record=NCBIXML.read(result_handle)
+        if ProjectDefinitions.DEBUG:
+            print("now working on:" + file)
+        result_handle = open(file)
+        records = NCBIXML.parse(result_handle)
 
-        nalignments=1
-        for alignment in blast_record.alignments:
-            if nalignments<=0:
-                continue
-            nalignments -= 1
+        for blast_record in records:
 
-            nhsps=1
-            for hsp in alignment.hsps:
-
-                #print "title: ", alignment.title, " hit_id: ", alignment.hit_id, " definition:", alignment.hit_def
-                if nhsps<=0:
+            nalignments=1000
+            for alignment in blast_record.alignments:
+                if nalignments<=0:
                     continue
-                nhsps -= 1
-                #information regarding hsp structure present in Bio.Blast.Records.py
+                nalignments -= 1
 
-                query_tokens = blast_record.query.split()
-                sequence_name = query_tokens[0]
-                #fasta sequences seem to end with '*', just strip that character
-                query_sequence = sequences[sequence_name][:-1]
-                #calculate the maximum possible score for this sequence, gap cost is arbitrary
-                max_score = sum(score_pairwise(query_sequence,query_sequence,blosum,-1,-1))
+                nhsps=1000
+                for hsp in alignment.hsps:
 
-                #if we have less than 50% of the points it isn't relevant
-                if ((hsp.score*100)/max_score) < 50:
-                    continue
+                    #print "title: ", alignment.title, " hit_id: ", alignment.hit_id, " definition:", alignment.hit_def
+                    if nhsps<=0:
+                        continue
+                    nhsps -= 1
+                    #information regarding hsp structure present in Bio.Blast.Records.py
 
-                match_length = hsp.query_end-hsp.query_start
-                #if we have less than 80% coverage then it isn't relevant
-                if ((match_length*100.0)/blast_record.query_letters)<80:
-                    continue
+                    query_tokens = blast_record.query.split()
+                    sequence_name = query_tokens[0]
+                    #fasta sequences seem to end with '*', just strip that character
+                    query_sequence = sequences[sequence_name][:-1]
+                    #calculate the maximum possible score for this sequence, gap cost is arbitrary
+                    max_score = sum(score_pairwise(query_sequence,query_sequence,blosum,-1,-1))
 
-                match_db = get_match_db(alignment.accession)
+                    #if we have less than 50% of the points it isn't relevant
+                    #if ((hsp.score*100)/max_score) < 50:
+                    #    continue
 
-                outhandle.write(blast_record.query +"\t"+ str(blast_record.query_letters) +"\t")
-                outhandle.write(match_db +"\t"+ alignment.accession +"\t"+ str(match_length) +"\t"+ str((match_length*100.0)/blast_record.query_letters) +"\t")
-                outhandle.write(str((hsp.score*100)/max_score) +"\t"+ str(hsp.expect))
-                outhandle.write("\n")
-        result_handle.close()
+                    match_length = hsp.query_end-hsp.query_start
+                    #if we have less than 80% coverage then it isn't relevant
+                    #if ((match_length*100.0)/blast_record.query_letters)<80:
+                    #    continue
 
-        #for full results comment this line out
-        #break
+                    match_db = get_match_db(alignment.accession)
+                    match_found = False
+                    #FIXMEL refseq matching is currently broken, I should find a workaround
+                    if match_db != "refseq" and match_db != "?":
+
+                        curs.execute("SELECT Gene_Name FROM drugs WHERE "+match_db+" LIKE '"+alignment.accession+"'")
+                        #curs.execute("SELECT Gene_Name FROM drugs WHERE "+ "PDB_ID" +" LIKE '"+ "2NSI" + "'")
+                        row = curs.fetchone()
+                        if row != None:
+                            print "Found a match for " + alignment.accession + ", it is: " + row[0]
+                            match_found = True
+
+                    outstr = blast_record.query +"\t"+ str(blast_record.query_letters) +"\t" + \
+                             match_db +"\t"+ alignment.accession +"\t"+ str(match_length) +"\t"+ \
+                             str((match_length*100.0)/blast_record.query_letters) +"\t" + \
+                             str((hsp.score*100)/max_score) +"\t"+ str(hsp.expect) + "\n"
+                    if(match_found):
+                        outhandle.write(outstr)
+                    else:
+                        outhandle_unfound.write(outstr)
+
+            #for full results comment this line out
+            #break
+
+    result_handle.close()
+
+
 
     outhandle.close()
+    outhandle_unfound.close()
 
 def get_match_db(accession_name):
     """
@@ -117,21 +149,21 @@ def get_match_db(accession_name):
     gb = re.compile(genbank)
     m = gb.match(accession_name)
     if m and m.group(0) == accession_name:
-        return "genbank"
+        return "GenBank_Protein_ID"
 
     #pdb is a mix of integers and characters with _A,_B,_C at the end
     pdb = '^[A-Za-z0-9]*_[A-Z]'
     pb = re.compile(pdb)
     m = pb.match(accession_name)
     if m and m.group(0) == accession_name:
-        return "pdb"
+        return "PDB_ID"
 
     #uniprot is a shit format that is mixed integers and numbers, this will probably fail (overmatch)
     uniprot = '^[A-Za-z0-9]*'
     up = re.compile(uniprot)
     m = up.match(accession_name)
     if m and m.group(0) == accession_name:
-        return "uniprot"
+        return "UniProt_ID"
 
     return "???"
 
@@ -140,12 +172,11 @@ def get_match_db(accession_name):
     re.compile(refseq)
     test = re.split(accession_name)
 
-def get_fasta_sequences():
-    filename = ProjectDefinitions.data_directory + "yeast_genome_proteins.fasta"
+def get_fasta_sequences(fasta_file):
     sys.stdout.write("parsing record... ")
     #Create a BioPython seq object
-    records = list(SeqIO.parse(filename, "fasta"))
-    print "parse complete, " + str(len(records)) + " records found!"
+    records = list(SeqIO.parse(fasta_file, "fasta"))
+    print "fasta sequence parse complete, " + str(len(records)) + " records found!\n"
 
     ret={}
     for record in records:
