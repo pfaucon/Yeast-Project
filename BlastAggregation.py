@@ -48,10 +48,10 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
 
     print "loading all sequences in ",directory, "..."
     outhandle = open(outfilename,"w")
-    outhandle.write("sequence name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\te_value\n")
+    outhandle.write("sequence_name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\tC_score\te_value\n")
 
     outhandle_unfound = open(outfilename[:-4] + "_unfound.txt","w")
-    outhandle_unfound.write("sequence name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\te_value\n")
+    outhandle_unfound.write("sequence_name\tsequence_length\tmatch_db\tmatch_name\tmatch_length\tpct_cover\tscore_frac\tC_score\te_value\n")
 
     conn = sqlite3.connect(ProjectDefinitions.data_directory+ProjectDefinitions.drugbank_db_name)
     curs = conn.cursor()
@@ -74,7 +74,7 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
                     continue
                 nalignments -= 1
 
-                nhsps=1000
+                nhsps=1
                 for hsp in alignment.hsps:
 
                     #print "title: ", alignment.title, " hit_id: ", alignment.hit_id, " definition:", alignment.hit_def
@@ -83,10 +83,11 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
                     nhsps -= 1
                     #information regarding hsp structure present in Bio.Blast.Records.py
 
+                    sequence_name = get_gene_id_from_fasta_name(blast_record.query)
                     query_tokens = blast_record.query.split()
-                    sequence_name = query_tokens[0]
+                    match_name = query_tokens[0]
                     #fasta sequences seem to end with '*', just strip that character
-                    query_sequence = sequences[sequence_name][:-1]
+                    query_sequence = sequences[match_name][:-1]
                     #calculate the maximum possible score for this sequence, gap cost is arbitrary
                     max_score = sum(score_pairwise(query_sequence,query_sequence,blosum,-1,-1))
 
@@ -102,7 +103,7 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
                     match_db = get_match_db(alignment.accession)
                     match_found = False
                     #FIXMEL refseq matching is currently broken, I should find a workaround
-                    if match_db != "refseq" and match_db != "?":
+                    if match_db == "GenBank_Protein_ID" or match_db == "UniProt_ID" or match_db == "PDB_ID":
 
                         curs.execute("SELECT Gene_Name FROM drugs WHERE "+match_db+" LIKE '"+alignment.accession+"'")
                         #curs.execute("SELECT Gene_Name FROM drugs WHERE "+ "PDB_ID" +" LIKE '"+ "2NSI" + "'")
@@ -110,11 +111,12 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
                         if row != None:
                             print "Found a match for " + alignment.accession + ", it is: " + row[0]
                             match_found = True
-
-                    outstr = blast_record.query +"\t"+ str(blast_record.query_letters) +"\t" + \
+                    pct_cover = (match_length*100)/blast_record.query_letters
+                    score_frac = (hsp.score*100)/max_score
+                    outstr = sequence_name +"\t"+ str(blast_record.query_letters) +"\t" + \
                              match_db +"\t"+ alignment.accession +"\t"+ str(match_length) +"\t"+ \
-                             str((match_length*100.0)/blast_record.query_letters) +"\t" + \
-                             str((hsp.score*100)/max_score) +"\t"+ str(hsp.expect) + "\n"
+                             str(pct_cover) +"\t" + str(score_frac) +"\t" + str(score_frac*pct_cover/100.0) +"\t"+ \
+                             str(hsp.expect) + "\n"
                     if(match_found):
                         outhandle.write(outstr)
                     else:
@@ -123,12 +125,16 @@ def analyzeDirectory(directory,outfilename, sequences, overwrite=False):
             #for full results comment this line out
             #break
 
-    result_handle.close()
+        result_handle.close()
 
 
 
     outhandle.close()
     outhandle_unfound.close()
+
+
+
+
 
 def get_match_db(accession_name):
     """
@@ -186,8 +192,23 @@ def get_fasta_sequences(fasta_file):
     return ret
 
 
-#load information from the blastp and deltablast results and then find matches
+def get_gene_id_from_fasta_name(fasta_name):
+    """
+    This method will extract the gene name from the fasta name, the type of ID is unknown to this method
+    @param fasta_name:
+    @return:
+    """
+    fasta_parts = fasta_name.split('|')
+    return fasta_parts[1]
 
+
+#FIXME: this alignment seems to have problems with the following sequences for unknown reasons, debug at some point
+#MFQQFQASCLVLFFLVGFAQQTLKPQNRKVDCNKGVTGTIYEYGALTLNGEEYIQFKQFAGKHVLFVNVAAYUGLAAQYPELNALQEELKNFGVIVLAFPCNQFGKQEPGTNSEILLGLKYVCPGSGFVPSFQLFEKGDVNGEKEQKVFTFLKNSCPPTSDLLGSSSQLFWEPMKVHDIRWNFEKFLVGPDGVPVMHWFHQAPVSTVKSDILEYLKQFNT
+#MGCAEGKAVAAAAPTELQTKGKNGDGRRRSAKDHHPGKTLPENPAGFTSTATADSRALLQAYIDGHSVVIFSRSTCTRCTEVKKLFKSLCVPYFVLELDQTEDGRALEGTLSELAAETDLPVVFVKQRKIGGHGPTLKAYQEGRLQKLLKMNGPEDLPKSYDYDLIIIGGGSGGLAAAKEAAQYGKKVMVLDFVTPTPLGTRWGLGGTCVNVGCIPKKLMHQAALLGQALQDSRNYGWKVEETVKHDWDRMIEAVQNHIGSLNWGYRVALREKKVVYENAYGQFIGPHRIKATNNKGKEKIYSAERFLIATGERPRYLGIPGDKEYCISSDDLFSLPYCPGKTLVVGASYVALECAGFLAGIGLDVTVMVRSILLRGFDQDMANKIGEHMEEHGIKFIRQFVPIKVEQIEAGTPGRLRVVAQSTNSEEIIEGEYNTVMLAIGRDACTRKIGLETVGVKINEKTGKIPVTDEEQTNVPYIYAIGDILEDKVELTPVAIQAGRLLAQRLYAGSTVKCDYENVPTTVFTPLEYGACGLSEEKAVEKFGEENIEVYHSYFWPLEWTIPSRDNNKCYAKIICNTKDNERVVGFHVLGPNAGEVTQGFAAALKCGLTKKQLDSTIGIHPVCAEVFTTLSVTKRSGASILQAGCU
+#MSLGRLCRLLKPALLCGALAAPGLAGTMCASRDDWRCARSMHEFSAKDIDGHMVNLDKYRGFVCIVTNVASQUGKTEVNYTQLVDLHARYAECGLRILAFPCNQFGKQEPGSNEEIKEFAAGYNVKFDMFSKICVNGDDAHPLWKWMKIQPKGKGILGNAIKWNFTKFLIDKNGCVVKRYGPMEEPLVIEKDLPHY
+#MARLLQASCLLSLLLAGFVSQSRGQEKSKMDCHGGISGTIYEYGALTIDGEEYIPFKQYAGKYVLFVNVASYUGLTGQYIELNALQEELAPFGLVILGFPCNQFGKQEPGENSEILPTLKYVRPGGGFVPNFQLFEKGDVNGEKEQKFYTFLKNSCPPTSELLGTSDRLFWEPMKVHDIRWNFEKFLVGPDGIPIMRWHHRTTVSNVKMDILSYMRRQAALGVKR
+#MAFIAKSFYDLSAISLDGEKVDFNTFRGRAVLIENVASLUGTTTRDFTQLNELQCRFPRRLVVLGFPCNQFGHQENCQNEEILNSLKYVRPGGGYQPTFTLVQKCEVNGQNEHPVFAYLKDKLPYPYDDPFSLMTDPKLIIWSPVRRSDVAWNFEKFLIGPEGEPFRRYSRTFPTINIEPDIKRLLKVA
+#MCAARLAAAAAAAQSVYAFSARPLAGGEPVSLGSLRGKVLLIENVASLUGTTVRDYTQMNELQRRLGPRGLVVLGFPCNQFGHQENAKNEEILNSLKYVRPGGGFEPNFMLFEKCEVNGAGAHPLFAFLREALPAPSDDATALMTDPKLITWSPVCRNDVAWNFEKFLVGPDGVPLRRYSRRFQTIDIEPDIEALLSQGPSC
 
 #from http://stackoverflow.com/questions/5686211/are-there-any-function-that-can-calculate-score-for-the-aligned-sequences-give-p
 def score_pairwise(seq1, seq2, matrix, gap_s, gap_e, gap = True):

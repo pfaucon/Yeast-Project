@@ -14,6 +14,7 @@ drugbankinfo = drugbankdir + "all_target_ids_all.csv"
 drugbank_db_name = "drugbank.sqlite"
 
 results_directory = os.path.abspath("../../Data/Results") + "/"
+final_result_csv = os.path.abspath("../../Data/Results") + "/drugbank_to_yeast_results.csv"
 
 def makeDirsIfNecessary(Directory):
     if not os.path.exists(Directory):
@@ -27,6 +28,4 @@ def make_directory_structure():
     makeDirsIfNecessary(blastpdir)
     makeDirsIfNecessary(deltablastdir)
     makeDirsIfNecessary(drugbankdir)
-    makeDirsIfNecessary(drugbankinfo)
-    makeDirsIfNecessary(drugbank_db_name)
     makeDirsIfNecessary(results_directory)
